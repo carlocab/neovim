@@ -118,6 +118,63 @@ jobs:
           path: build/release/nvim-macos.tar.gz
           retention-days: 1
 
+  macOS-universal:
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install brew packages
+        run: |
+          brew update --quiet
+          brew install automake ninja
+      - if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name != 'nightly')
+        run: printf 'NVIM_BUILD_TYPE=Release\n' >> $GITHUB_ENV
+      - if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name == 'nightly')
+        run: printf 'NVIM_BUILD_TYPE=RelWithDebInfo\n' >> $GITHUB_ENV
+      - name: Provision universal `libintl`
+        run: |
+          bottle_tag="arm64_big_sur"
+          brew fetch --bottle-tag="$bottle_tag" gettext
+          cd "$(mktemp -d)"
+          tar xf "$(brew --cache)"/**/*gettext*${bottle_tag}*.tar.gz
+          gettext_prefix="$(brew --prefix gettext)"
+          broken_install_name="$(otool -D gettext/*/lib/libintl.dylib | sed 1d)"
+          fixed_install_name="$(otool -D "${gettext_prefix}/lib/libintl.dylib" | sed 1d)"
+          libintl_basename="$(basename "$fixed_install_name")"
+          install_name_tool -change "$broken_install_name" "$fixed_install_name" gettext/*/lib/"$libintl_basename"
+          lipo gettext/*/lib/"$libintl_basename" \
+               "${gettext_prefix}/lib/${libintl_basename}" \
+               -create -output "$libintl_basename"
+          mv -f "$libintl_basename" "${gettext_prefix}/lib/${libintl_basename}"
+      - name: Build release
+        run: |
+          make CMAKE_BUILD_TYPE=${NVIM_BUILD_TYPE} \
+               CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX:PATH= -DCMAKE_OSX_DEPLOYMENT_TARGET=11 -DCMAKE_OSX_ARCHITECTURES=arm64\;x86_64"
+          make DESTDIR="$GITHUB_WORKSPACE/build/release/nvim-universal" install
+      - name: Create package
+        run: |
+          cd "$GITHUB_WORKSPACE/build/release"
+          mkdir -p nvim-universal/libs
+          libs=($(otool -L nvim-universal/bin/nvim | sed 1d | sed -E -e 's|^[[:space:]]*||' -e 's| .*||'))
+          echo "libs:"
+          for lib in "${libs[@]}"; do
+            if echo "$lib" | grep -q -E '/usr/lib|/System' 2>/dev/null; then
+              echo "  [skipped] $lib"
+            else
+              echo "  $lib"
+              relname="libs/${lib##*/}"
+              cp -L "$lib" "nvim-universal/$relname"
+              install_name_tool -change "$lib" "@executable_path/../$relname" nvim-universal/bin/nvim
+            fi
+          done
+          tar cfz nvim-macos-universal.tar.gz nvim-universal
+      - uses: actions/upload-artifact@v3
+        with:
+          name: nvim-macos-universal
+          path: build/release/nvim-macos-universal.tar.gz
+          retention-days: 1
+
   windows:
     runs-on: windows-2019
     env:
@@ -148,7 +205,7 @@ jobs:
           retention-days: 1
 
   publish:
-    needs: [linux, appimage, macOS, windows]
+    needs: [linux, appimage, macOS, macOS-universal, windows]
     runs-on: ubuntu-20.04
     env:
       GH_REPO: ${{ github.repository }}
@@ -214,6 +271,11 @@ jobs:
           cd ./nvim-macos
           sha256sum nvim-macos.tar.gz > nvim-macos.tar.gz.sha256sum
           echo "SHA_MACOS=$(cat nvim-macos.tar.gz.sha256sum)" >> $GITHUB_ENV
+      - name: Generate macOS-universal SHA256 checksums
+        run: |
+          cd ./nvim-macos-universal
+          sha256sum nvim-macos-universal.tar.gz > nvim-macos-universal.tar.gz.sha256sum
+          echo "SHA_MACOS_UNIVERSAL=$(cat nvim-macos-universal.tar.gz.sha256sum)" >> $GITHUB_ENV
       - name: Generate Win64 SHA256 checksums
         run: |
           cd ./nvim-win64
@@ -228,7 +290,7 @@ jobs:
           DEBUG: api
         run: |
           envsubst < "$GITHUB_WORKSPACE/.github/workflows/notes.md" > "$RUNNER_TEMP/notes.md"
-          gh release create $TAG_NAME $PRERELEASE --notes-file "$RUNNER_TEMP/notes.md" --title "$SUBJECT" --target $GITHUB_SHA nvim-macos/* nvim-linux64/* appimage/* nvim-win64/*
+          gh release create $TAG_NAME $PRERELEASE --notes-file "$RUNNER_TEMP/notes.md" --title "$SUBJECT" --target $GITHUB_SHA nvim-macos/* nvim-macos-universal/* nvim-linux64/* appimage/* nvim-win64/*
           if [ "$TAG_NAME" != "nightly" ]; then
-            gh release create stable $PRERELEASE --notes-file "$RUNNER_TEMP/notes.md" --title "$SUBJECT" --target $GITHUB_SHA nvim-macos/* nvim-linux64/* appimage/* nvim-win64/*
+            gh release create stable $PRERELEASE --notes-file "$RUNNER_TEMP/notes.md" --title "$SUBJECT" --target $GITHUB_SHA nvim-macos/* nvim-macos-universal/* nvim-linux64/* appimage/* nvim-win64/*
           fi

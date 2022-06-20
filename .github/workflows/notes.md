@@ -18,11 +18,17 @@ ${NVIM_VERSION}
 2. Run the MSI
 3. Search and run `nvim-qt.exe` or run `nvim.exe` on your CLI of choice.
 
-### macOS
+### macOS 10.11+
 
 1. Download **nvim-macos.tar.gz**
 2. Extract: `tar xzvf nvim-macos.tar.gz`
 3. Run `./nvim-osx64/bin/nvim`
+
+### macOS 11+ (Universal)
+
+1. Download **nvim-macos-universal.tar.gz**
+2. Extract: `tar xzvf nvim-macos-universal.tar.gz`
+3. Run `./nvim-universal/bin/nvim`
 
 ### Linux (x64)
 
@@ -59,6 +65,7 @@ ${SHA_LINUX_64_DEB}
 ${SHA_APP_IMAGE}
 ${SHA_APP_IMAGE_ZSYNC}
 ${SHA_MACOS}
+${SHA_MACOS_UNIVERSAL}
 ${SHA_WIN_64_ZIP}
 ${SHA_WIN_64_MSI}
 ```
