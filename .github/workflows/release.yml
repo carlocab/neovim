@@ -150,7 +150,8 @@ jobs:
       - name: Build release
         run: |
           make CMAKE_BUILD_TYPE=${NVIM_BUILD_TYPE} \
-               CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX:PATH= -DCMAKE_OSX_DEPLOYMENT_TARGET=11 -DCMAKE_OSX_ARCHITECTURES=arm64\;x86_64"
+               CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX:PATH= -DCMAKE_OSX_DEPLOYMENT_TARGET=11 -DCMAKE_OSX_ARCHITECTURES=arm64\;x86_64" \
+               DEPS_CMAKE_FLAGS="-DCMAKE_OSX_ARCHITECTURES=arm64\;x86_64"
           make DESTDIR="$GITHUB_WORKSPACE/build/release/nvim-universal" install
       - name: Create package
         run: |
