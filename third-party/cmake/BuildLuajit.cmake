@@ -5,7 +5,7 @@ function(BuildLuajit)
   cmake_parse_arguments(_luajit
     ""
     "TARGET"
-    "CONFIGURE_COMMAND;BUILD_COMMAND;INSTALL_COMMAND"
+    "CONFIGURE_COMMAND;BUILD_COMMAND;INSTALL_COMMAND;DEPENDS"
     ${ARGN})
   if(NOT _luajit_CONFIGURE_COMMAND AND NOT _luajit_BUILD_COMMAND
         AND NOT _luajit_INSTALL_COMMAND)
