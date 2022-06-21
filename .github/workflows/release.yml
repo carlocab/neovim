@@ -143,7 +143,8 @@ jobs:
           libintl_basename="$(basename "$libintl_install_name")"
           install_name_tool -id "$libintl_install_name" gettext/*/lib/"$libintl_basename"
           lipo gettext/*/lib/"$libintl_basename" "$libintl_install_name" -create -output "$libintl_basename"
-          mv -f "$libintl_basename" "${gettext_prefix}/lib/${libintl_basename}"
+          mv -f "$libintl_basename" "$libintl_install_name"
+          codesign --force --sign - "$libintl_install_name"
       - name: Build release
         run: |
           export MACOSX_DEPLOYMENT_TARGET="11"
@@ -159,7 +160,7 @@ jobs:
           libs=($(otool -L nvim-universal/bin/nvim | sed 1d | sed -E -e 's|^[[:space:]]*||' -e 's| .*||'))
           echo "libs:"
           for lib in "${libs[@]}"; do
-            if echo "$lib" | grep -q -E '/usr/lib|/System' 2>/dev/null; then
+            if echo "$lib" | grep -q -E '^(/usr/lib|/System)' 2>/dev/null; then
               echo "  [skipped] $lib"
             else
               echo "  $lib"
@@ -168,6 +169,7 @@ jobs:
               install_name_tool -change "$lib" "@executable_path/../$relname" nvim-universal/bin/nvim
             fi
           done
+          codesign --force --sign - nvim-universal/bin/nvim
           tar cfz nvim-macos-universal.tar.gz nvim-universal
       - uses: actions/upload-artifact@v3
         with:
