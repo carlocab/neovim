@@ -30,7 +30,8 @@ function(BuildLuajit)
     CONFIGURE_COMMAND "${_luajit_CONFIGURE_COMMAND}"
     BUILD_IN_SOURCE 1
     BUILD_COMMAND "${_luajit_BUILD_COMMAND}"
-    INSTALL_COMMAND "${_luajit_INSTALL_COMMAND}")
+    INSTALL_COMMAND "${_luajit_INSTALL_COMMAND}"
+    DEPENDS ${_luajit_DEPENDS})
 
   # Create symlink for development version manually.
   if(UNIX)
@@ -51,30 +52,58 @@ if(CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
 else()
   set(AMD64_ABI "")
 endif()
-set(INSTALLCMD_UNIX ${MAKE_PRG} CFLAGS=-fPIC
+set(BUILDCMD_UNIX ${MAKE_PRG} CFLAGS=-fPIC
                                 CFLAGS+=-DLUA_USE_APICHECK
                                 CFLAGS+=-funwind-tables
                                 ${NO_STACK_CHECK}
                                 ${AMD64_ABI}
                                 CCDEBUG+=-g
-                                Q=
-                                install)
+                                Q=)
 
-if(UNIX)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    if(CMAKE_OSX_DEPLOYMENT_TARGET)
-      set(DEPLOYMENT_TARGET "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-    else()
-      # Use the same target as our nightly builds
-      set(DEPLOYMENT_TARGET "MACOSX_DEPLOYMENT_TARGET=10.11")
-    endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  if(CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(DEPLOYMENT_TARGET "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
   else()
-    set(DEPLOYMENT_TARGET "")
+    # Use the same target as our nightly builds
+    set(DEPLOYMENT_TARGET "MACOSX_DEPLOYMENT_TARGET=10.11")
   endif()
+else()
+  set(DEPLOYMENT_TARGET "")
+endif()
 
-  BuildLuaJit(INSTALL_COMMAND ${INSTALLCMD_UNIX}
+if(UNIX AND NOT CMAKE_OSX_ARCHITECTURES)
+  BuildLuaJit(INSTALL_COMMAND ${BUILDCMD_UNIX}
     CC=${DEPS_C_COMPILER} PREFIX=${DEPS_INSTALL_DIR}
-    ${DEPLOYMENT_TARGET})
+    ${DEPLOYMENT_TARGET} install)
+
+elseif(CMAKE_OSX_ARCHITECTURES AND APPLE)
+
+  set(LJ_SRC_DIR "${DEPS_BUILD_DIR}/src/luajit")
+  foreach(ARCH IN LISTS CMAKE_OSX_ARCHITECTURES)
+    set(STATIC_CC "${LJ_C_COMPILER} -arch ${ARCH}")
+    set(DYNAMIC_CC "${LJ_C_COMPILER} -arch ${ARCH} -fPIC")
+    set(TARGET_LD "${LJ_C_COMPILER} -arch ${ARCH}")
+    list(APPEND LUAJIT_THIN_EXECUTABLE "${LJ_SRC_DIR}-${ARCH}/src/luajit")
+    list(APPEND LUAJIT_THIN_STATIC_LIB "${LJ_SRC_DIR}-${ARCH}/src/libluajit.a")
+    list(APPEND LUAJIT_THIN_DYN_LIB "${LJ_SRC_DIR}-${ARCH}/src/libluajit.so")
+    list(APPEND LUAJIT_THIN_DEPS "luajit-${ARCH}")
+
+    BuildLuaJit(TARGET "luajit-${ARCH}"
+        BUILD_COMMAND ${BUILDCMD_UNIX}
+        CC=${LJ_C_COMPILER} STATIC_CC=${STATIC_CC}
+        DYNAMIC_CC=${DYNAMIC_CC} TARGET_LD=${TARGET_LD}
+        PREFIX=${DEPS_INSTALL_DIR}
+        ${DEPLOYMENT_TARGET})
+  endforeach(ARCH IN LISTSCMAKE_OSX_ARCHITECTURES)
+  BuildLuaJit(
+    CONFIGURE_COMMAND ${BUILDCMD_UNIX} CC=${LJ_C_COMPILER} PREFIX=${DEPS_INSTALL_DIR} ${DEPLOYMENT_TARGET}
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${LJ_SRC_DIR}/src/luajit ${LJ_SRC_DIR}/src/libluajit.so ${LJ_SRC_DIR}/src/libluajit.a
+    BUILD_COMMAND lipo ${LUAJIT_THIN_EXECUTABLE} -create -output ${LJ_SRC_DIR}/src/luajit
+    COMMAND lipo ${LUAJIT_THIN_STATIC_LIB} -create -output ${LJ_SRC_DIR}/src/libluajit.a
+    COMMAND lipo ${LUAJIT_THIN_DYN_LIB} -create -output ${LJ_SRC_DIR}/src/libluajit.so
+    INSTALL_COMMAND ${BUILDCMD_UNIX} PREFIX=${DEPS_INSTALL_DIR} ${DEPLOYMENT_TARGET} install
+    DEPENDS ${LUAJIT_THIN_DEPS}
+    )
 
 elseif(MINGW)
 
