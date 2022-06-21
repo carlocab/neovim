@@ -139,13 +139,10 @@ jobs:
           cd "$(mktemp -d)"
           tar xf "$(brew --cache)"/**/*gettext*${bottle_tag}*.tar.gz
           gettext_prefix="$(brew --prefix gettext)"
-          broken_install_name="$(otool -D gettext/*/lib/libintl.dylib | sed 1d)"
-          fixed_install_name="$(otool -D "${gettext_prefix}/lib/libintl.dylib" | sed 1d)"
-          libintl_basename="$(basename "$fixed_install_name")"
-          install_name_tool -change "$broken_install_name" "$fixed_install_name" gettext/*/lib/"$libintl_basename"
-          lipo gettext/*/lib/"$libintl_basename" \
-               "${gettext_prefix}/lib/${libintl_basename}" \
-               -create -output "$libintl_basename"
+          libintl_install_name="$(otool -D "${gettext_prefix}/lib/libintl.dylib" | sed 1d)"
+          libintl_basename="$(basename "$libintl_install_name")"
+          install_name_tool -id "$libintl_install_name" gettext/*/lib/"$libintl_basename"
+          lipo gettext/*/lib/"$libintl_basename" "$libintl_install_name" -create -output "$libintl_basename"
           mv -f "$libintl_basename" "${gettext_prefix}/lib/${libintl_basename}"
       - name: Build release
         run: |
