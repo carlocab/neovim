@@ -29,7 +29,11 @@ find_path(LibIntl_INCLUDE_DIR
 find_library(LibIntl_LIBRARY
     NAMES intl libintl
 )
-
+find_library(CoreFoundation_FRAMEWORK CoreFoundation)
+message(STATUS "LibIntl_INCLUDE_DIR = ${LibIntl_INCLUDE_DIR}")
+message(STATUS "LibIntl_LIBRARY = ${LibIntl_LIBRARY}")
+message(STATUS "ICONV_LIBRARY = ${ICONV_LIBRARY}")
+message(STATUS "CoreFoundation_FRAMEWORK = ${CoreFoundation_FRAMEWORK}")
 if (LibIntl_INCLUDE_DIR)
   list(APPEND CMAKE_REQUIRED_INCLUDES "${LibIntl_INCLUDE_DIR}")
 endif()
@@ -41,7 +45,6 @@ endif()
 if (MSVC)
   list(APPEND CMAKE_REQUIRED_LIBRARIES ${ICONV_LIBRARY})
 endif()
-list(APPEND CMAKE_REQUIRED_FLAGS "-liconv -framework CoreFoundation")
 check_c_source_compiles("
 #include <libintl.h>
 
