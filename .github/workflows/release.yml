@@ -100,9 +100,13 @@ jobs:
           # We're about to mangle `gettext`, so let's remove any potentially broken
           # installs (e.g. curl, git) as those could interfere with our build.
           brew uninstall $(brew uses --installed --recursive gettext)
-          brew unlink gettext
-          ln -sf "$(brew --prefix)/opt/$(readlink "${GETTEXT_PREFIX}")/bin"/* /usr/local/bin/
-          rm -f "$GETTEXT_PREFIX"
+          for dylib in "${GETTEXT_PREFIX}"/lib/*.dylib
+          do
+            rm -f "$dylib" "/usr/local/lib/$(basename "$dylib")"
+          done
+          # The Mono framework bundles gettext libraries and headers
+          # that are found by CMake. We don't want those.
+          sudo rm -rf /Library/Frameworks/Mono.framework
       - name: Build release
         run: |
           export MACOSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion | cut -f1 -d.)"
