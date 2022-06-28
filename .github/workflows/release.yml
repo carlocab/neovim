@@ -106,9 +106,23 @@ jobs:
           # We're about to mangle `gettext`, so let's remove any potentially broken
           # installs (e.g. curl, git) as those could interfere with our build.
           brew uninstall $(brew uses --installed --recursive gettext)
-          brew unlink gettext
-          ln -sf "$(brew --prefix)/opt/$(readlink "${GETTEXT_PREFIX}")/bin"/* /usr/local/bin/
-          rm -f "$GETTEXT_PREFIX"
+          for dylib in "${GETTEXT_PREFIX}"/lib/*.dylib
+          do
+            rm -f "$dylib" "/usr/local/lib/$(basename "$dylib")"
+          done
+      - name: Test `HAVE_WORKING_LIBINTL`
+        run: |
+          clang -xc - -o /dev/null -lintl -liconv -framework CoreFoundation <<EOS
+            #include <libintl.h>
+
+            int main(int argc, char** argv) {
+              gettext("foo");
+              ngettext("foo", "bar", 1);
+              bindtextdomain("foo", "bar");
+              bind_textdomain_codeset("foo", "bar");
+              textdomain("foo");
+            }
+          EOS
       - name: Build release
         run: |
           export MACOSX_DEPLOYMENT_TARGET="$(sw_vers -productVersion | cut -f1 -d.)"

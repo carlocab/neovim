@@ -41,6 +41,7 @@ endif()
 if (MSVC)
   list(APPEND CMAKE_REQUIRED_LIBRARIES ${ICONV_LIBRARY})
 endif()
+list(APPEND CMAKE_REQUIRED_FLAGS "-liconv -framework CoreFoundation")
 check_c_source_compiles("
 #include <libintl.h>
 
