@@ -110,6 +110,8 @@ jobs:
           do
             rm -f "$dylib" "/usr/local/lib/$(basename "$dylib")"
           done
+          # This isn't the the libintl we're looking for
+          sudo rm -rf "$(readlink /Library/Frameworks/Mono.framework/Headers/libintl.h)"
       - name: Test `HAVE_WORKING_LIBINTL`
         run: |
           clang -xc - -o /dev/null -lintl -liconv -framework CoreFoundation <<EOS
